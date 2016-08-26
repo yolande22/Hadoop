@@ -1,0 +1,128 @@
+﻿-- ----------------------------------------------------------------------------------------------
+-- -----------------------------KWEDOM Annick Yolande--------------------------------------------
+-- -----------------------------Projet BD 6 -----------------------------------------------------
+-- ----------------------------------------------------------------------------------------------
+
+
+cd exercises
+
+unzip ml-100k.zip
+
+cd ml-100k
+
+hive
+
+CREATE DATABASE MovieLens;
+
+USE MovieLens;
+
+CREATE TABLE u_data (user_id INT, movieid INT, rating INT, unixtime STRING) ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t' STORED AS TEXTFILE;
+
+describe u_data;
+
+LOAD DATA LOCAL INPATH '/home/cloudera/exercises/ml-100k/u.data' OVERWRITE INTO TABLE u_data;
+
+CREATE TABLE u_user ( userid INT, age INT, gender STRING, occupation STRING, zipcode STRING) ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' STORED AS TEXTFILE;
+
+LOAD DATA LOCAL INPATH '/home/cloudera/exercises/ml-100k/u.user' OVERWRITE INTO TABLE u_user;
+
+
+CREATE TABLE u_item ( movieid INT, title STRING, release_date STRING, url STRING, unknown INT, action INT, adventure INT, animation INT, childrens INT, comedy INT, crime INT, documentary INT, drama INT, fantasy INT,  film_noir INT, horror INT, musical INT, mystery INT, romance INT, sci_fi  INT, thriller INT, war INT, western INT) ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' STORED AS TEXTFILE;
+
+LOAD DATA LOCAL INPATH '/home/cloudera/exercises/ml-100k/u.item' OVERWRITE INTO TABLE u_item;
+
+-- Q 1 - En tenant compte des films déjà évalués par chaque utilisateur, écrire une requête qui permet de trouver pour chaque utilisateur 
+-- la  liste de films les mieux  par ordre décroissant. Commencez par créer une table utilisateur avec un unique user_id.
+
+CREATE TABLE bestusermovies AS
+SELECT u.userid, d.movieid, t.title, d.rating 
+FROM U_ITEM t  JOIN U_DATA d ON (t.movieid = d.movieid) JOIN U_USER u ON (d.user_id = u.userid) 
+ORDER BY u.userid, d.rating DESC, d.movieid;
+
+
+--Q 2 –  Récupérer les films ayant au moins une note égale ou supérieurs à un seuil que vous définissez. 
+--Sélectionnez la note du film mais aussi son genre et la date de sortie, en faisant une moyenne de note pour chaque utilisateur.
+--Éliminer autant de films mal notés que possible.
+
+CREATE TABLE bestmoviesrating AS
+SELECT p.movieid, p.c, f.title, f.release_date, CONCAT_WS('|',f.action,f.adventure,f.animation,f.childrens,f.comedy,f.crime,f.documentary,f.drama,f.fantasy,f.film_noir,f.horror,f.musical,f.mystery,f.romance,f.sci_fi,f.thriller,f.war,f.western,f.unknown) as genre 
+ FROM ( SELECT d.movieid, AVG(rating ) c
+ FROM U_DATA d
+ GROUP BY d.movieid
+ HAVING c>=3.0) p  JOIN (SELECT t.movieid, t.title, t.release_date,
+CASE WHEN action=1 THEN 'action' END AS action,
+CASE WHEN adventure=1 THEN 'adventure' END AS adventure,
+CASE WHEN animation=1 THEN 'animation' END AS animation,
+CASE WHEN childrens=1 THEN 'childrens'   END AS childrens,
+CASE WHEN comedy=1 THEN 'comedy' END AS comedy,
+CASE WHEN crime=1 THEN 'crime'  END AS crime,
+CASE WHEN documentary=1 THEN'documentary' END AS documentary,
+CASE WHEN drama=1 THEN 'drama'  END AS drama,
+CASE WHEN fantasy=1 THEN 'fantasy'  END AS fantasy,
+CASE WHEN film_noir=1 THEN 'film_noir' END AS film_noir,
+CASE WHEN horror=1 THEN 'horror'  END AS horror,
+CASE WHEN musical=1 THEN 'musical'  END AS musical,
+CASE WHEN mystery=1 THEN 'mystery'   END AS mystery,
+CASE WHEN romance=1 THEN 'romance'   END AS romance,
+CASE WHEN sci_fi=1 THEN 'sci_fi' END AS sci_fi,
+CASE WHEN thriller=1 THEN 'thriller'  END AS thriller,
+CASE WHEN war=1 THEN 'war' END AS war,
+CASE WHEN western=1 THEN 'western'  END AS western,
+CASE WHEN unknown = 1 THEN 'unknown'  END AS unknown
+
+FROM U_ITEM t) f ON (f.movieid=p.movieid)
+ORDER BY c DESC, movieid ASC;
+ 
+--Q 3 –  Pour chaque utilisateur, récupérer la liste des 5 premiers films favoris en sélectionnant également le genre et la date de sortie du film
+
+CREATE TABLE top5usermovies AS
+SELECT p.userid, p.movieid, f.title, p.rating, f.release_date, CONCAT_WS('|', f.action,f.adventure,f.animation,f.childrens,f.comedy,f.crime,f.documentary,f.drama,f.fantasy,f.film_noir,f.horror,f.musical,f.mystery,f.romance,f.sci_fi,f.thriller,f.war,f.western,f.unknown) as genre 
+ FROM ( SELECT t.*
+FROM (SELECT t.*, ROW_NUMBER() OVER (PARTITION BY userid ORDER BY rating DESC) as seqnum
+      FROM bestusermovies t
+     ) t
+WHERE seqnum <= 5) p  JOIN (SELECT t.movieid, t.title, t.release_date,
+CASE WHEN action=1 THEN 'action' END AS action,
+CASE WHEN adventure=1 THEN 'adventure'  END AS adventure,
+CASE WHEN animation=1 THEN 'animation'  END AS animation,
+CASE WHEN childrens=1 THEN 'childrens' END AS childrens,
+CASE WHEN comedy=1 THEN 'comedy' END AS comedy,
+CASE WHEN crime=1 THEN 'crime'   END AS crime,
+CASE WHEN documentary=1 THEN 'documentary'  END AS documentary,
+CASE WHEN drama=1 THEN 'drama'  END AS drama,
+CASE WHEN fantasy=1 THEN 'fantasy' END AS fantasy,
+CASE WHEN film_noir=1 THEN 'film_noir'  END AS film_noir,
+CASE WHEN horror=1 THEN 'horror'   END AS horror,
+CASE WHEN musical=1 THEN 'musical' END AS musical,
+CASE WHEN mystery=1 THEN 'mystery'  END AS mystery,
+CASE WHEN romance=1 THEN 'romance'  END AS romance,
+CASE WHEN sci_fi=1 THEN 'sci_fi'  END AS sci_fi,
+CASE WHEN thriller=1 THEN 'thriller'  END AS thriller,
+CASE WHEN war=1 THEN 'war' END AS war,
+CASE WHEN western=1 THEN 'western'  END AS western,
+CASE WHEN unknown = 1 THEN 'unknown' END AS unknown
+
+FROM U_ITEM t) f ON (f.movieid=p.movieid)
+ORDER BY userid, rating, movieid ;
+
+
+--Q4 – Créer une table qui contient les similarités entre les films en prenant comme critères les genres du film et classe par la plus récente date de sortie.   	
+
+CREATE TABLE similarities AS
+SELECT a.release_date, a.movieid, a.title, b.movieid as movieidsimilar, b.title as moviesimilar, a.genre, b.genre as genresimilar  
+FROM bestmoviesrating a JOIN bestmoviesrating b ON (1=1)
+WHERE ((a.movieid != b.movieid) AND (REGEXP_REPLACE(a.genre,b.genre, '')!=a.genre))
+ORDER BY unix_timestamp(a.release_date,'dd-MMM-yyyy') desc, a.genre, a.movieid ;
+
+
+--Q5 – Créer une table reco qui va contenir pour chaque utilisateur (user_id) la liste des films similaires au top 5 des films favoris (movie_id).
+
+CREATE TABLE reco AS
+SELECT t.userid, s.release_date, s.movieid, s.title, s.genre, s.movieidsimilar, s.moviesimilar, s.genresimilar
+FROM top5usermovies t JOIN similarities s ON (t.movieid=s.movieid)
+ORDER BY userid,  s.movieid, s.movieidsimilar ;
+
+--Q6 – Stockez le résultat final  dans un répertoire « resultat_reco ». Pour chaque film on récupérer son titre, sa date de sortie et son genre
+
+INSERT OVERWRITE LOCAL DIRECTORY '/home/cloudera/resultat_reco'  ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t' STORED AS TEXTFILE
+SELECT * FROM reco;
